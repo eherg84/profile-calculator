@@ -43,7 +43,7 @@ The project uses a pure JavaScript approach with no build tools required. Tests 
 ├── .github/
 │   └── workflows/
 │       └── test.yml      # GitHub Actions workflow
-├── .standalone/
+├── standalone/
 │   ├── js/
 │   │   ├── core/
 │   │   │   ├── config/   # Configuration modules

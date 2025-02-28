@@ -39,7 +39,15 @@
     <div id="output" class="test-output"></div>
 
     <script type="module">
-        import configManager, { MaterialConfig, ProfileConfig, UIConfig } from '../js/core/config/index.js';
+        // Update import path to work with GitHub Pages
+        const baseUrl = window.location.pathname.includes('/profile-calculator') 
+            ? '/profile-calculator'
+            : '';
+        
+        const configModulePath = `${baseUrl}/standalone/js/core/config/index.js`;
+        
+        // Dynamic import to handle base URL
+        const { default: configManager, MaterialConfig, ProfileConfig, UIConfig } = await import(configModulePath);
 
         // Test helper functions
         function assert(condition, message) {

@@ -40,6 +40,12 @@
             font-family: monospace;
         }
     </style>
+    <script>
+        // Get base URL for GitHub Pages
+        const baseUrl = window.location.pathname.includes('/profile-calculator') 
+            ? '/profile-calculator'
+            : '';
+    </script>
 </head>
 <body>
     <h1>Profile Calculator Test Suite</h1>
@@ -47,22 +53,27 @@
     <div class="test-section">
         <h2>Configuration Manager Tests</h2>
         <button onclick="runTest('configManager')">Run Tests</button>
-        <iframe id="configManager" class="test-frame" src="standalone/test/configManager.html"></iframe>
+        <iframe id="configManager" class="test-frame"></iframe>
     </div>
 
     <div class="test-section">
         <h2>Profile Calculator Tests</h2>
         <button onclick="runTest('profileCalculator')">Run Tests</button>
-        <iframe id="profileCalculator" class="test-frame" src="standalone/test/profileCalculator.html"></iframe>
+        <iframe id="profileCalculator" class="test-frame"></iframe>
     </div>
 
     <div class="test-section">
         <h2>Material Configuration Tests</h2>
         <button onclick="runTest('materialConfig')">Run Tests</button>
-        <iframe id="materialConfig" class="test-frame" src="standalone/test/materialConfig.html"></iframe>
+        <iframe id="materialConfig" class="test-frame"></iframe>
     </div>
 
     <script>
+        // Set iframe sources with correct base URL
+        document.getElementById('configManager').src = `${baseUrl}/standalone/test/configManager.html`;
+        document.getElementById('profileCalculator').src = `${baseUrl}/standalone/test/profileCalculator.html`;
+        document.getElementById('materialConfig').src = `${baseUrl}/standalone/test/materialConfig.html`;
+
         function runTest(testId) {
             const frame = document.getElementById(testId);
             frame.contentWindow.runTests();

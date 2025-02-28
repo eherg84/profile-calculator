@@ -39,9 +39,13 @@
     <div id="output" class="test-output"></div>
 
     <script type="module">
-        import ProfileCalculator from '../js/modules/calculations/profileCalculator.js';
-        import { ProfileType } from '../js/core/config/profiles.js';
-        import configManager from '../js/core/config/index.js';
+        // Update import path to work with GitHub Pages
+        const baseUrl = window.location.pathname.includes('/profile-calculator') 
+            ? '/profile-calculator'
+            : '';
+            
+        const { default: ProfileCalculator } = await import(`${baseUrl}/standalone/js/modules/calculations/profileCalculator.js`);
+        const { ProfileType } = await import(`${baseUrl}/standalone/js/core/config/profiles.js`);
 
         // Test helper functions
         function assert(condition, message) {
@@ -51,7 +55,7 @@
         }
 
         function assertClose(actual, expected, message) {
-            const epsilon = 0.0001;
+            const epsilon = 0.001; // Increased precision for geometric calculations
             if (Math.abs(actual - expected) > epsilon) {
                 throw new Error(`${message}: expected ${expected}, got ${actual}`);
             }

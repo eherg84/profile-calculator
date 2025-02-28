@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Standalone Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .test-group {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .test-output {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Standalone Implementation Tests</h1>
+    
+    <div class="test-group">
+        <h2>Event System Test</h2>
+        <div id="event-output" class="test-output"></div>
+        <button onclick="runEventTests()">Run Event Tests</button>
+    </div>
+
+    <div class="test-group">
+        <h2>File Store Test</h2>
+        <div id="file-drop-zone" style="border: 2px dashed #ccc; padding: 20px; text-align: center;">
+            Drop BIX or BPF files here to test file handling
+        </div>
+        <div id="file-output" class="test-output"></div>
+    </div>
+
+    <div class="test-group">
+        <h2>Component Store Test</h2>
+        <div id="component-output" class="test-output"></div>
+        <button onclick="runComponentTests()">Run Component Tests</button>
+    </div>
+
+    <div class="test-group">
+        <h2>Material Store Test</h2>
+        <div id="material-output" class="test-output"></div>
+        <button onclick="runMaterialTests()">Run Material Tests</button>
+    </div>
+
+    <div class="test-group">
+        <h2>UI Store Test</h2>
+        <div id="ui-output" class="test-output"></div>
+        <button onclick="runUITests()">Run UI Tests</button>
+    </div>
+
+    <!-- Processor Tests -->
+    <div class="test-section">
+        <h2>Processor Tests</h2>
+        <button onclick="runProcessorTests()">Run Processor Tests</button>
+        <div id="processorTestOutput" class="test-output"></div>
+    </div>
+
+    <script>
+        // Event System Implementation
+        class EventBus {
+            constructor() {
+                this.events = new Map();
+                this.debugMode = false;
+            }
+
+            on(event, callback) {
+                if (!this.events.has(event)) {
+                    this.events.set(event, new Set());
+                }
+                this.events.get(event).add(callback);
+                if (this.debugMode) {
+                    console.log(`Event: Subscribed to "${event}"`);
+                }
+                return () => this.off(event, callback);
+            }
+
+            off(event, callback) {
+                if (this.events.has(event)) {
+                    this.events.get(event).delete(callback);
+                }
+            }
+
+            emit(event, data) {
+                if (this.events.has(event)) {
+                    if (this.debugMode) {
+                        console.log(`Event: Emitting "${event}"`, data);
+                    }
+                    this.events.get(event).forEach(callback => {
+                        try {
+                            callback(data);
+                        } catch (error) {
+                            console.error(`Error in event handler for "${event}":`, error);
+                        }
+                    });
+                }
+            }
+
+            setDebug(enabled) {
+                this.debugMode = enabled;
+            }
+
+            clear() {
+                this.events.clear();
+            }
+        }
+
+        // File Store Implementation
+        class FileStore {
+            constructor() {
+                this.bixFiles = new Map();
+                this.bpfFiles = new Map();
+                this.eventBus = eventBus;
+            }
+
+            addFile(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const content = reader.result;
+                        if (file.name.toLowerCase().endsWith('.bix')) {
+                            this.bixFiles.set(file.name, content);
+                            this.eventBus.emit('file:loaded', { type: 'bix', name: file.name });
+                        } else if (file.name.toLowerCase().endsWith('.bpf')) {
+                            this.bpfFiles.set(file.name, content);
+                            this.eventBus.emit('file:loaded', { type: 'bpf', name: file.name });
+                        }
+                        resolve({ name: file.name, content });
+                    };
+                    reader.onerror = () => reject(reader.error);
+                    reader.readAsText(file);
+                });
+            }
+
+            getFile(filename) {
+                if (filename.toLowerCase().endsWith('.bix')) {
+                    return this.bixFiles.get(filename);
+                }
+                return this.bpfFiles.get(filename);
+            }
+
+            clear() {
+                this.bixFiles.clear();
+                this.bpfFiles.clear();
+            }
+        }
+
+        // Component Store Implementation
+        const ComponentType = {
+            PROFILE: 'profile',
+            ASSEMBLY: 'assembly',
+            PART: 'part'
+        };
+
+        class Component {
+            constructor(data) {
+                this.id = data.id || crypto.randomUUID();
+                this.type = data.type || ComponentType.PART;
+                this.name = data.name || '';
+                this.material = data.material || null;
+                this.profile = data.profile || null;
+                this.dimensions = data.dimensions || {};
+                this.quantity = data.quantity || 1;
+                this.weight = data.weight || 0;
+                this.parent = data.parent || null;
+                this.children = new Set(data.children || []);
+                this.metadata = data.metadata || {};
+                this.sourceFile = data.sourceFile || null;
+                this.validation = {
+                    isValid: true,
+                    errors: []
+                };
+            }
+
+            addChild(childId) {
+                this.children.add(childId);
+            }
+
+            removeChild(childId) {
+                this.children.delete(childId);
+            }
+
+            validate() {
+                this.validation.errors = [];
+                
+                if (!this.name) {
+                    this.validation.errors.push('Name is required');
+                }
+                if (!this.material) {
+                    this.validation.errors.push('Material is required');
+                }
+                if (!this.profile) {
+                    this.validation.errors.push('Profile is required');
+                }
+                if (this.quantity < 1) {
+                    this.validation.errors.push('Quantity must be at least 1');
+                }
+
+                this.validation.isValid = this.validation.errors.length === 0;
+                return this.validation.isValid;
+            }
+        }
+
+        class ComponentStore {
+            constructor(eventBus) {
+                this.components = new Map();
+                this.eventBus = eventBus;
+                this.relationships = new Map();
+            }
+
+            createComponent(data) {
+                const component = new Component(data);
+                if (component.validate()) {
+                    this.components.set(component.id, component);
+                    
+                    if (component.parent) {
+                        const parent = this.components.get(component.parent);
+                        if (parent) {
+                            parent.addChild(component.id);
+                        }
+                    }
+
+                    this.eventBus.emit('component:created', { component });
+                    return component;
+                } else {
+                    this.eventBus.emit('component:error', { 
+                        type: 'validation',
+                        errors: component.validation.errors 
+                    });
+                    return null;
+                }
+            }
+
+            getComponent(id) {
+                return this.components.get(id) || null;
+            }
+
+            updateComponent(id, updates) {
+                const component = this.components.get(id);
+                if (!component) {
+                    this.eventBus.emit('component:error', {
+                        type: 'notFound',
+                        id
+                    });
+                    return null;
+                }
+
+                Object.assign(component, updates);
+                if (component.validate()) {
+                    this.eventBus.emit('component:updated', { component });
+                    return component;
+                } else {
+                    this.eventBus.emit('component:error', {
+                        type: 'validation',
+                        errors: component.validation.errors
+                    });
+                    return null;
+                }
+            }
+
+            deleteComponent(id) {
+                const component = this.components.get(id);
+                if (!component) return false;
+
+                if (component.parent) {
+                    const parent = this.components.get(component.parent);
+                    if (parent) {
+                        parent.removeChild(id);
+                    }
+                }
+
+                component.children.forEach(childId => {
+                    this.deleteComponent(childId);
+                });
+
+                this.components.delete(id);
+                this.eventBus.emit('component:deleted', { id });
+                return true;
+            }
+
+            getAllComponents() {
+                return Array.from(this.components.values());
+            }
+
+            getComponentsByType(type) {
+                return this.getAllComponents().filter(c => c.type === type);
+            }
+
+            clear() {
+                this.components.clear();
+                this.relationships.clear();
+                this.eventBus.emit('component:cleared');
+            }
+        }
+
+        // Material Store Implementation
+        const MaterialType = {
+            STEEL: 'steel',
+            ALUMINUM: 'aluminum',
+            STAINLESS_STEEL: 'stainless_steel',
+            OTHER: 'other'
+        };
+
+        const GradeCategory = {
+            STRUCTURAL: 'structural',
+            COMMERCIAL: 'commercial',
+            SPECIALTY: 'specialty'
+        };
+
+        class Material {
+            constructor(data) {
+                this.id = data.id || crypto.randomUUID();
+                this.type = data.type || MaterialType.OTHER;
+                this.name = data.name || '';
+                this.grade = data.grade || '';
+                this.category = data.category || GradeCategory.COMMERCIAL;
+                this.properties = {
+                    density: data.properties?.density || 0,
+                    yieldStrength: data.properties?.yieldStrength || 0,
+                    tensileStrength: data.properties?.tensileStrength || 0,
+                    elasticModulus: data.properties?.elasticModulus || 0,
+                    ...data.properties
+                };
+                this.metadata = data.metadata || {};
+                this.validation = {
+                    isValid: true,
+                    errors: []
+                };
+            }
+
+            validate() {
+                this.validation.errors = [];
+
+                if (!this.name) {
+                    this.validation.errors.push('Name is required');
+                }
+                if (!this.type) {
+                    this.validation.errors.push('Material type is required');
+                }
+                if (!this.grade) {
+                    this.validation.errors.push('Grade is required');
+                }
+                if (this.properties.density <= 0) {
+                    this.validation.errors.push('Density must be greater than 0');
+                }
+
+                this.validation.isValid = this.validation.errors.length === 0;
+                return this.validation.isValid;
+            }
+
+            calculateWeight(volume) {
+                return volume * this.properties.density;
+            }
+        }
+
+        class MaterialStore {
+            constructor(eventBus) {
+                this.materials = new Map();
+                this.eventBus = eventBus;
+                this.gradesByType = new Map();
+                this.initializeDefaultGrades();
+            }
+
+            initializeDefaultGrades() {
+                this.gradesByType.set(MaterialType.STEEL, new Set([
+                    'A36', 'A572-50', 'A992', 'A500'
+                ]));
+                
+                this.gradesByType.set(MaterialType.ALUMINUM, new Set([
+                    '6061-T6', '6063-T6', '5052-H32', '3003-H14'
+                ]));
+                
+                this.gradesByType.set(MaterialType.STAINLESS_STEEL, new Set([
+                    '304', '316', '316L', '430'
+                ]));
+            }
+
+            createMaterial(data) {
+                const material = new Material(data);
+                if (material.validate()) {
+                    this.materials.set(material.id, material);
+                    this.eventBus.emit('material:created', { material });
+                    return material;
+                } else {
+                    this.eventBus.emit('material:error', {
+                        type: 'validation',
+                        errors: material.validation.errors
+                    });
+                    return null;
+                }
+            }
+
+            getMaterial(id) {
+                return this.materials.get(id) || null;
+            }
+
+            updateMaterial(id, updates) {
+                const material = this.materials.get(id);
+                if (!material) {
+                    this.eventBus.emit('material:error', {
+                        type: 'notFound',
+                        id
+                    });
+                    return null;
+                }
+
+                Object.assign(material, updates);
+                if (material.validate()) {
+                    this.eventBus.emit('material:updated', { material });
+                    return material;
+                } else {
+                    this.eventBus.emit('material:error', {
+                        type: 'validation',
+                        errors: material.validation.errors
+                    });
+                    return null;
+                }
+            }
+
+            deleteMaterial(id) {
+                const material = this.materials.get(id);
+                if (!material) return false;
+
+                this.materials.delete(id);
+                this.eventBus.emit('material:deleted', { id });
+                return true;
+            }
+
+            getAllMaterials() {
+                return Array.from(this.materials.values());
+            }
+
+            getMaterialsByType(type) {
+                return this.getAllMaterials().filter(m => m.type === type);
+            }
+
+            getGradesForType(type) {
+                return this.gradesByType.get(type) || new Set();
+            }
+
+            addGrade(type, grade) {
+                if (!this.gradesByType.has(type)) {
+                    this.gradesByType.set(type, new Set());
+                }
+                this.gradesByType.get(type).add(grade);
+                this.eventBus.emit('material:gradeAdded', { type, grade });
+            }
+
+            removeGrade(type, grade) {
+                if (this.gradesByType.has(type)) {
+                    this.gradesByType.get(type).delete(grade);
+                    this.eventBus.emit('material:gradeRemoved', { type, grade });
+                }
+            }
+
+            clear() {
+                this.materials.clear();
+                this.gradesByType.clear();
+                this.initializeDefaultGrades();
+                this.eventBus.emit('material:cleared');
+            }
+        }
+
+        // UI Store Implementation
+        const ViewType = {
+            TABLE: 'table',
+            SUMMARY: 'summary',
+            MATERIAL_LIST: 'material_list'
+        };
+
+        const SortDirection = {
+            ASC: 'ascending',
+            DESC: 'descending'
+        };
+
+        const FilterOperator = {
+            EQUALS: 'equals',
+            CONTAINS: 'contains',
+            GREATER_THAN: 'greater_than',
+            LESS_THAN: 'less_than',
+            BETWEEN: 'between',
+            IN: 'in'
+        };
+
+        class Filter {
+            constructor(data) {
+                this.field = data.field || '';
+                this.operator = data.operator || FilterOperator.EQUALS;
+                this.value = data.value;
+                this.enabled = data.enabled ?? true;
+            }
+
+            apply(item) {
+                if (!this.enabled || !this.field) return true;
+                
+                const fieldValue = item[this.field];
+                
+                switch (this.operator) {
+                    case FilterOperator.EQUALS:
+                        return fieldValue === this.value;
+                    case FilterOperator.CONTAINS:
+                        return String(fieldValue).toLowerCase()
+                            .includes(String(this.value).toLowerCase());
+                    case FilterOperator.GREATER_THAN:
+                        return fieldValue > this.value;
+                    case FilterOperator.LESS_THAN:
+                        return fieldValue < this.value;
+                    case FilterOperator.BETWEEN:
+                        return fieldValue >= this.value[0] && fieldValue <= this.value[1];
+                    case FilterOperator.IN:
+                        return Array.isArray(this.value) && this.value.includes(fieldValue);
+                    default:
+                        return true;
+                }
+            }
+        }
+
+        class UIStore {
+            constructor(eventBus) {
+                this.eventBus = eventBus;
+                this.state = {
+                    view: ViewType.TABLE,
+                    table: {
+                        filters: [],
+                        sort: {
+                            field: '',
+                            direction: SortDirection.ASC
+                        },
+                        pagination: {
+                            page: 1,
+                            pageSize: 10
+                        }
+                    },
+                    preferences: {
+                        theme: 'light',
+                        language: 'en'
+                    }
+                };
+                this.loadState();
+            }
+
+            setView(view) {
+                if (Object.values(ViewType).includes(view)) {
+                    this.state.view = view;
+                    this.saveState();
+                    this.eventBus.emit('ui:viewChanged', { view });
+                } else {
+                    this.eventBus.emit('ui:error', {
+                        type: 'invalidView',
+                        view
+                    });
+                }
+            }
+
+            addFilter(filter) {
+                this.state.table.filters.push(filter);
+                this.saveState();
+                this.eventBus.emit('ui:filterAdded', { filter });
+            }
+
+            removeFilter(index) {
+                if (index >= 0 && index < this.state.table.filters.length) {
+                    const removedFilter = this.state.table.filters.splice(index, 1)[0];
+                    this.saveState();
+                    this.eventBus.emit('ui:filterRemoved', { filter: removedFilter });
+                }
+            }
+
+            setSort(field, direction) {
+                if (Object.values(SortDirection).includes(direction)) {
+                    this.state.table.sort = { field, direction };
+                    this.saveState();
+                    this.eventBus.emit('ui:sortChanged', { field, direction });
+                }
+            }
+
+            setPage(page) {
+                this.state.table.pagination.page = page;
+                this.saveState();
+                this.eventBus.emit('ui:pageChanged', { page });
+            }
+
+            setPageSize(pageSize) {
+                this.state.table.pagination.pageSize = pageSize;
+                this.saveState();
+                this.eventBus.emit('ui:pageSizeChanged', { pageSize });
+            }
+
+            setPreference(key, value) {
+                this.state.preferences[key] = value;
+                this.saveState();
+                this.eventBus.emit('ui:preferenceChanged', { key, value });
+            }
+
+            saveState() {
+                localStorage.setItem('uiState', JSON.stringify(this.state));
+            }
+
+            loadState() {
+                const savedState = localStorage.getItem('uiState');
+                if (savedState) {
+                    this.state = JSON.parse(savedState);
+                }
+            }
+        }
+
+        // Base Processor class
+        class BaseProcessor {
+            constructor(eventBus) {
+                this.eventBus = eventBus;
+                this.errors = [];
+                this.warnings = [];
+            }
+
+            reset() {
+                this.errors = [];
+                this.warnings = [];
+            }
+
+            addError(message, context = {}) {
+                const error = {
+                    message,
+                    context,
+                    timestamp: new Date()
+                };
+                this.errors.push(error);
+                this.eventBus.emit('processor:error', error);
+            }
+
+            addWarning(message, context = {}) {
+                const warning = {
+                    message,
+                    context,
+                    timestamp: new Date()
+                };
+                this.warnings.push(warning);
+                this.eventBus.emit('processor:warning', warning);
+            }
+
+            hasErrors() {
+                return this.errors.length > 0;
+            }
+
+            hasWarnings() {
+                return this.warnings.length > 0;
+            }
+
+            getErrors() {
+                return [...this.errors];
+            }
+
+            getWarnings() {
+                return [...this.warnings];
+            }
+
+            validateInput(data) {
+                if (!data) {
+                    this.addError('Input data is required');
+                    return false;
+                }
+                return true;
+            }
+
+            process(data) {
+                throw new Error('process() must be implemented by child class');
+            }
+        }
+
+        // Test processor implementation
+        class TestProcessor extends BaseProcessor {
+            constructor(eventBus) {
+                super(eventBus);
+            }
+
+            process(data) {
+                if (!this.validateInput(data)) {
+                    return null;
+                }
+
+                if (data.shouldFail) {
+                    this.addError('Processing failed', { reason: 'Test failure' });
+                    return null;
+                }
+
+                if (data.shouldWarn) {
+                    this.addWarning('Processing warning', { reason: 'Test warning' });
+                }
+
+                return { processed: true, data };
+            }
+        }
+
+        // BIX Processor Implementation
+        class BIXProcessor extends BaseProcessor {
+            constructor(eventBus, componentStore, materialStore) {
+                super(eventBus);
+                this.componentStore = componentStore;
+                this.materialStore = materialStore;
+            }
+
+            validateInput(data) {
+                if (!super.validateInput(data)) {
+                    return false;
+                }
+                if (!data.content || !data.filename) {
+                    this.addError('Content and filename are required');
+                    return false;
+                }
+                if (!data.filename.toLowerCase().endsWith('.bix')) {
+                    this.addError('Invalid file type, must be .bix');
+                    return false;
+                }
+                return true;
+            }
+
+            process(data) {
+                if (!this.validateInput(data)) {
+                    return null;
+                }
+
+                try {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(data.content, 'text/xml');
+
+                    if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+                        this.addError('Invalid XML format');
+                        return null;
+                    }
+
+                    const materials = this.processMaterials(xmlDoc);
+                    const components = this.processComponents(xmlDoc);
+
+                    return {
+                        materials,
+                        components
+                    };
+                } catch (error) {
+                    this.addError('Failed to process BIX file', { error: error.message });
+                    return null;
+                }
+            }
+
+            processMaterials(xmlDoc) {
+                const materials = [];
+                const materialNodes = xmlDoc.getElementsByTagName('Material');
+
+                for (const node of materialNodes) {
+                    const material = {
+                        id: node.getAttribute('id'),
+                        name: node.getAttribute('name'),
+                        type: node.getAttribute('type'),
+                        grade: node.getAttribute('grade'),
+                        properties: {}
+                    };
+
+                    const propertyNodes = node.getElementsByTagName('Property');
+                    for (const prop of propertyNodes) {
+                        material.properties[prop.getAttribute('name')] = prop.getAttribute('value');
+                    }
+
+                    this.materialStore.createMaterial(material);
+                    materials.push(material);
+                }
+
+                return materials;
+            }
+
+            processComponents(xmlDoc) {
+                const components = [];
+                const componentNodes = xmlDoc.getElementsByTagName('Component');
+
+                for (const node of componentNodes) {
+                    const component = {
+                        id: node.getAttribute('id'),
+                        type: node.getAttribute('type'),
+                        name: node.getAttribute('name'),
+                        material: node.getAttribute('materialId'),
+                        profile: node.getAttribute('profile'),
+                        dimensions: {},
+                        metadata: {}
+                    };
+
+                    const dimensionNodes = node.getElementsByTagName('Dimension');
+                    for (const dim of dimensionNodes) {
+                        component.dimensions[dim.getAttribute('type')] = 
+                            parseFloat(dim.getAttribute('value'));
+                    }
+
+                    const propertyNodes = node.getElementsByTagName('Property');
+                    for (const prop of propertyNodes) {
+                        component.metadata[prop.getAttribute('name')] = 
+                            prop.getAttribute('value');
+                    }
+
+                    const childNodes = node.getElementsByTagName('Child');
+                    if (childNodes.length > 0) {
+                        component.children = Array.from(childNodes).map(
+                            child => child.getAttribute('refId')
+                        );
+                    }
+
+                    this.componentStore.createComponent(component);
+                    components.push(component);
+                }
+
+                return components;
+            }
+        }
+
+        // BPF Processor Implementation
+        class BPFProcessor extends BaseProcessor {
+            constructor(eventBus, componentStore, materialStore) {
+                super(eventBus);
+                this.componentStore = componentStore;
+                this.materialStore = materialStore;
+            }
+
+            validateInput(data) {
+                if (!super.validateInput(data)) {
+                    return false;
+                }
+                if (!data.content || !data.filename) {
+                    this.addError('Content and filename are required');
+                    return false;
+                }
+                if (!data.filename.toLowerCase().endsWith('.bpf')) {
+                    this.addError('Invalid file type, must be .bpf');
+                    return false;
+                }
+                return true;
+            }
+
+            process(data) {
+                if (!this.validateInput(data)) {
+                    return null;
+                }
+
+                try {
+                    let jsonData = JSON.parse(data.content);
+                    const materials = this.processMaterials(jsonData);
+                    const components = this.processComponents(jsonData);
+
+                    return {
+                        materials,
+                        components
+                    };
+                } catch (error) {
+                    this.addError('Failed to process BPF file', { error: error.message });
+                    return null;
+                }
+            }
+
+            processMaterials(jsonData) {
+                const materials = [];
+                if (jsonData.materials) {
+                    for (const material of jsonData.materials) {
+                        this.materialStore.createMaterial(material);
+                        materials.push(material);
+                    }
+                }
+                return materials;
+            }
+
+            processComponents(jsonData) {
+                const components = [];
+                if (jsonData.components) {
+                    for (const component of jsonData.components) {
+                        this.componentStore.createComponent(component);
+                        components.push(component);
+                    }
+                }
+                return components;
+            }
+        }
+
+        // Run processor tests
+        function runProcessorTests() {
+            const output = document.getElementById('processorTestOutput');
+            output.innerHTML = '';
+            const log = createLogger(output);
+
+            try {
+                log('Running processor tests...');
+
+                // Test event handling
+                const events = [];
+                const mockEventBus = {
+                    emit: (event, data) => {
+                        events.push({ event, data });
+                    }
+                };
+
+                const processor = new TestProcessor(mockEventBus);
+
+                // Test error handling
+                processor.process({ shouldFail: true });
+                assert(processor.hasErrors(), 'Processor should have errors');
+                assert(processor.getErrors().length === 1, 'Processor should have one error');
+                assert(events.some(e => e.event === 'processor:error'), 'Error event should be emitted');
+
+                processor.reset();
+                assert(!processor.hasErrors(), 'Processor should have no errors after reset');
+
+                // Test warning handling
+                processor.process({ shouldWarn: true });
+                assert(processor.hasWarnings(), 'Processor should have warnings');
+                assert(processor.getWarnings().length === 1, 'Processor should have one warning');
+                assert(events.some(e => e.event === 'processor:warning'), 'Warning event should be emitted');
+
+                // Test successful processing
+                const result = processor.process({ test: 'data' });
+                assert(result && result.processed, 'Processing should succeed');
+
+                log('✅ All processor tests passed!');
+
+            } catch (error) {
+                log('❌ Test error: ' + error.message);
+            }
+        }
+
+        // Create instances
+        const eventBus = new EventBus();
+        const fileStore = new FileStore();
+        const componentStore = new ComponentStore(eventBus);
+        const materialStore = new MaterialStore(eventBus);
+        const uiStore = new UIStore(eventBus);
+        const bixProcessor = new BIXProcessor(eventBus, componentStore, materialStore);
+        const bpfProcessor = new BPFProcessor(eventBus, componentStore, materialStore);
+
+        // Event System Tests
+        function runEventTests() {
+            const output = document.getElementById('event-output');
+            output.innerHTML = '';
+            
+            try {
+                eventBus.setDebug(true);
+
+                // Test 1: Basic subscription
+                let testPassed = false;
+                const unsubscribe = eventBus.on('test:event', (data) => {
+                    testPassed = data.success;
+                });
+
+                eventBus.emit('test:event', { success: true });
+                updateOutput('event-output', 'Test 1 - Basic event: ' + (testPassed ? 'PASSED' : 'FAILED'));
+
+                // Test 2: Unsubscribe
+                unsubscribe();
+                testPassed = true;
+                eventBus.emit('test:event', { success: false });
+                updateOutput('event-output', 'Test 2 - Unsubscribe: ' + (testPassed ? 'PASSED' : 'FAILED'));
+
+                // Test 3: Multiple subscribers
+                let callCount = 0;
+                const handler1 = () => callCount++;
+                const handler2 = () => callCount++;
+
+                eventBus.on('multi:test', handler1);
+                eventBus.on('multi:test', handler2);
+                eventBus.emit('multi:test');
+
+                updateOutput('event-output', 'Test 3 - Multiple subscribers: ' + 
+                    (callCount === 2 ? 'PASSED' : 'FAILED'));
+
+                eventBus.clear();
+                updateOutput('event-output', 'All event tests completed');
+
+            } catch (error) {
+                updateOutput('event-output', 'Test error: ' + error.message, true);
+            }
+        }
+
+        // File handling setup
+        const dropZone = document.getElementById('file-drop-zone');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.style.background = '#e1f5fe';
+            dropZone.style.borderColor = '#2196f3';
+        }
+
+        function unhighlight(e) {
+            dropZone.style.background = '';
+            dropZone.style.borderColor = '#ccc';
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        async function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            try {
+                for (const file of files) {
+                    const result = await fileStore.addFile(file);
+                    updateOutput('file-output', `Loaded ${file.name} successfully`, false);
+                    
+                    // Display file content preview
+                    const content = fileStore.getFile(file.name);
+                    const preview = content.substring(0, 100) + '...';
+                    updateOutput('file-output', `Preview of ${file.name}:\n${preview}`, false);
+                }
+            } catch (error) {
+                updateOutput('file-output', `Error loading files: ${error.message}`, true);
+            }
+        }
+
+        // Component Tests
+        function runComponentTests() {
+            const output = document.getElementById('component-output');
+            output.innerHTML = '';
+            
+            try {
+                // Test 1: Create valid component
+                const validComponent = componentStore.createComponent({
+                    name: 'Test Component',
+                    material: 'Steel',
+                    profile: 'Rectangle',
+                    dimensions: { width: 100, height: 50 }
+                });
+                updateOutput('component-output', 'Test 1 - Create valid component: ' + 
+                    (validComponent !== null ? 'PASSED' : 'FAILED'));
+
+                // Test 2: Create invalid component
+                const invalidComponent = componentStore.createComponent({
+                    // Missing required fields
+                });
+                updateOutput('component-output', 'Test 2 - Reject invalid component: ' + 
+                    (invalidComponent === null ? 'PASSED' : 'FAILED'));
+
+                // Test 3: Update component
+                const updatedComponent = componentStore.updateComponent(validComponent.id, {
+                    name: 'Updated Component'
+                });
+                updateOutput('component-output', 'Test 3 - Update component: ' + 
+                    (updatedComponent?.name === 'Updated Component' ? 'PASSED' : 'FAILED'));
+
+                // Test 4: Parent-child relationship
+                const parentComponent = componentStore.createComponent({
+                    name: 'Parent',
+                    material: 'Steel',
+                    profile: 'Square',
+                    dimensions: { width: 200, height: 200 }
+                });
+
+                const childComponent = componentStore.createComponent({
+                    name: 'Child',
+                    material: 'Steel',
+                    profile: 'Rectangle',
+                    dimensions: { width: 100, height: 50 },
+                    parent: parentComponent.id
+                });
+
+                const hasChild = parentComponent.children.has(childComponent.id);
+                updateOutput('component-output', 'Test 4 - Parent-child relationship: ' + 
+                    (hasChild ? 'PASSED' : 'FAILED'));
+
+                // Test 5: Delete component
+                const deleted = componentStore.deleteComponent(validComponent.id);
+                const notFound = componentStore.getComponent(validComponent.id);
+                updateOutput('component-output', 'Test 5 - Delete component: ' + 
+                    (deleted && notFound === null ? 'PASSED' : 'FAILED'));
+
+                // Cleanup
+                componentStore.clear();
+                updateOutput('component-output', 'All component tests completed');
+
+            } catch (error) {
+                updateOutput('component-output', 'Test error: ' + error.message, true);
+            }
+        }
+
+        // Material Store Tests
+        function runMaterialTests() {
+            const output = document.getElementById('material-output');
+            output.innerHTML = '';
+            
+            try {
+                // Test 1: Create valid material
+                const validMaterial = materialStore.createMaterial({
+                    name: 'Structural Steel',
+                    type: MaterialType.STEEL,
+                    grade: 'A36',
+                    category: GradeCategory.STRUCTURAL,
+                    properties: {
+                        density: 7850, // kg/m³
+                        yieldStrength: 250, // MPa
+                        tensileStrength: 400, // MPa
+                        elasticModulus: 200000 // MPa
+                    }
+                });
+                updateOutput('material-output', 'Test 1 - Create valid material: ' + 
+                    (validMaterial !== null ? 'PASSED' : 'FAILED'));
+
+                // Test 2: Create invalid material
+                const invalidMaterial = materialStore.createMaterial({
+                    // Missing required fields
+                });
+                updateOutput('material-output', 'Test 2 - Reject invalid material: ' + 
+                    (invalidMaterial === null ? 'PASSED' : 'FAILED'));
+
+                // Test 3: Update material
+                const updatedMaterial = materialStore.updateMaterial(validMaterial.id, {
+                    name: 'Updated Steel'
+                });
+                updateOutput('material-output', 'Test 3 - Update material: ' + 
+                    (updatedMaterial?.name === 'Updated Steel' ? 'PASSED' : 'FAILED'));
+
+                // Test 4: Grade management
+                const steelGrades = materialStore.getGradesForType(MaterialType.STEEL);
+                const hasDefaultGrades = steelGrades.has('A36') && steelGrades.has('A572-50');
+                updateOutput('material-output', 'Test 4 - Default grades: ' + 
+                    (hasDefaultGrades ? 'PASSED' : 'FAILED'));
+
+                // Test 5: Add custom grade
+                materialStore.addGrade(MaterialType.STEEL, 'CUSTOM-GRADE');
+                const hasCustomGrade = materialStore.getGradesForType(MaterialType.STEEL).has('CUSTOM-GRADE');
+                updateOutput('material-output', 'Test 5 - Add custom grade: ' + 
+                    (hasCustomGrade ? 'PASSED' : 'FAILED'));
+
+                // Test 6: Weight calculation
+                const volume = 0.1; // m³
+                const expectedWeight = volume * validMaterial.properties.density;
+                const calculatedWeight = validMaterial.calculateWeight(volume);
+                updateOutput('material-output', 'Test 6 - Weight calculation: ' + 
+                    (Math.abs(calculatedWeight - expectedWeight) < 0.001 ? 'PASSED' : 'FAILED'));
+
+                // Test 7: Delete material
+                const deleted = materialStore.deleteMaterial(validMaterial.id);
+                const notFound = materialStore.getMaterial(validMaterial.id);
+                updateOutput('material-output', 'Test 7 - Delete material: ' + 
+                    (deleted && notFound === null ? 'PASSED' : 'FAILED'));
+
+                // Cleanup
+                materialStore.clear();
+                updateOutput('material-output', 'All material tests completed');
+
+            } catch (error) {
+                updateOutput('material-output', 'Test error: ' + error.message, true);
+            }
+        }
+
+        // UI Store Tests
+        function runUITests() {
+            const output = document.getElementById('ui-output');
+            output.innerHTML = '';
+            
+            try {
+                // Test 1: View switching
+                uiStore.setView(ViewType.SUMMARY);
+                updateOutput('ui-output', 'Test 1 - View switching: ' + 
+                    (uiStore.state.view === ViewType.SUMMARY ? 'PASSED' : 'FAILED'));
+
+                // Test 2: Invalid view handling
+                uiStore.setView('invalid-view');
+                updateOutput('ui-output', 'Test 2 - Invalid view handling: ' + 
+                    (uiStore.state.view === ViewType.SUMMARY ? 'PASSED' : 'FAILED'));
+
+                // Test 3: Filter operations
+                const filter = new Filter({
+                    field: 'name',
+                    operator: FilterOperator.CONTAINS,
+                    value: 'Test'
+                });
+                uiStore.addFilter(filter);
+                updateOutput('ui-output', 'Test 3 - Filter operations: ' + 
+                    (uiStore.state.table.filters.length === 1 ? 'PASSED' : 'FAILED'));
+
+                // Test 4: Sorting capabilities
+                uiStore.setSort('name', SortDirection.DESC);
+                updateOutput('ui-output', 'Test 4 - Sorting capabilities: ' + 
+                    (uiStore.state.table.sort.field === 'name' && 
+                     uiStore.state.table.sort.direction === SortDirection.DESC ? 'PASSED' : 'FAILED'));
+
+                // Test 5: Pagination
+                uiStore.setPage(2);
+                updateOutput('ui-output', 'Test 5 - Pagination: ' + 
+                    (uiStore.state.table.pagination.page === 2 ? 'PASSED' : 'FAILED'));
+
+                // Test 6: Preferences handling
+                uiStore.setPreference('theme', 'dark');
+                updateOutput('ui-output', 'Test 6 - Preferences handling: ' + 
+                    (uiStore.state.preferences.theme === 'dark' ? 'PASSED' : 'FAILED'));
+
+                // Test 7: State persistence
+                const savedState = JSON.parse(localStorage.getItem('uiState'));
+                updateOutput('ui-output', 'Test 7 - State persistence: ' + 
+                    (savedState && savedState.preferences.theme === 'dark' ? 'PASSED' : 'FAILED'));
+
+                updateOutput('ui-output', 'All UI tests completed');
+
+            } catch (error) {
+                updateOutput('ui-output', 'Test error: ' + error.message, true);
+            }
+        }
+
+        // Helper functions for testing
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message);
+            }
+        }
+
+        function createLogger(output) {
+            return function(message) {
+                const div = document.createElement('div');
+                div.textContent = message;
+                div.className = message.includes('✅') ? 'success' : '';
+                output.appendChild(div);
+            };
+        }
+
+        function updateOutput(elementId, message, isError = false) {
+            const output = document.getElementById(elementId);
+            const div = document.createElement('div');
+            div.textContent = message;
+            div.className = isError ? 'error' : 'success';
+            output.appendChild(div);
+        }
+    </script>
+</body>
+</html> 

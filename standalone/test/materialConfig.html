@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Material Configuration Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .test-output {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Material Configuration Tests</h1>
+    <button onclick="runTests()">Run Tests</button>
+    <div id="output" class="test-output"></div>
+
+    <script type="module">
+        import {
+            MaterialType,
+            GradeCategory,
+            DefaultProperties,
+            PropertyValidation,
+            GradeValidation,
+            MaterialMetadata
+        } from '../js/core/config/materials.js';
+
+        import { MaterialStore } from '../js/core/store/materialStore.js';
+
+        // Test helper functions
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message);
+            }
+        }
+
+        function assertClose(actual, expected, message) {
+            const epsilon = 0.0001;
+            assert(Math.abs(actual - expected) < epsilon, message);
+        }
+
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += message + '\n';
+        }
+
+        // Make runTests available globally
+        window.runTests = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = '';
+            
+            try {
+                // Setup
+                const mockEventBus = {
+                    emit: function(event, data) {
+                        log(`Event emitted: ${event}`);
+                    }
+                };
+
+                log('Running Material Configuration Tests...');
+
+                // Test Material Types
+                assert(MaterialType.STEEL === 'steel', 'Steel type should be defined correctly');
+                assert(MaterialType.ALUMINUM === 'aluminum', 'Aluminum type should be defined correctly');
+                assert(MaterialType.STAINLESS_STEEL === 'stainless_steel', 'Stainless steel type should be defined correctly');
+
+                // Test Grade Categories
+                assert(GradeCategory.STRUCTURAL === 'structural', 'Structural category should be defined correctly');
+                assert(GradeCategory.COMMERCIAL === 'commercial', 'Commercial category should be defined correctly');
+                assert(GradeCategory.SPECIALTY === 'specialty', 'Specialty category should be defined correctly');
+
+                // Test Default Properties
+                const steelA36 = DefaultProperties[MaterialType.STEEL]['A36'];
+                assert(steelA36.density === 7850, 'A36 steel density should be correct');
+                assert(steelA36.yieldStrength === 250, 'A36 steel yield strength should be correct');
+
+                const aluminum6061 = DefaultProperties[MaterialType.ALUMINUM]['6061-T6'];
+                assert(aluminum6061.density === 2700, '6061-T6 aluminum density should be correct');
+                assert(aluminum6061.yieldStrength === 240, '6061-T6 aluminum yield strength should be correct');
+
+                // Test Property Validation
+                assert(PropertyValidation.density.min === 1000, 'Minimum density should be correct');
+                assert(PropertyValidation.density.max === 20000, 'Maximum density should be correct');
+                assert(PropertyValidation.density.required === true, 'Density should be required');
+
+                // Test Grade Validation
+                assert(GradeValidation.minLength === 2, 'Minimum grade length should be correct');
+                assert(GradeValidation.maxLength === 20, 'Maximum grade length should be correct');
+                assert(GradeValidation.pattern.test('A36'), 'Grade pattern should accept valid grade');
+                assert(!GradeValidation.pattern.test('A@36'), 'Grade pattern should reject invalid grade');
+
+                // Test Material Metadata
+                const steelMetadata = MaterialMetadata[MaterialType.STEEL];
+                assert(steelMetadata.name === 'Steel', 'Steel metadata name should be correct');
+                assert(Array.isArray(steelMetadata.standards), 'Steel standards should be an array');
+                assert(steelMetadata.standards.includes('ASTM'), 'Steel standards should include ASTM');
+
+                // Test MaterialStore integration
+                const materialStore = new MaterialStore(mockEventBus);
+
+                // Test default grade initialization
+                const steelGrades = materialStore.getGradesForType(MaterialType.STEEL);
+                assert(steelGrades.has('A36'), 'Steel grades should include A36');
+                assert(steelGrades.has('A572-50'), 'Steel grades should include A572-50');
+
+                // Test material creation with default properties
+                const material = materialStore.createMaterial({
+                    type: MaterialType.STEEL,
+                    name: 'Test Steel',
+                    grade: 'A36'
+                });
+
+                assert(material !== null, 'Material should be created successfully');
+                assert(material.properties.density === 7850, 'Material should have default density');
+                assert(material.properties.yieldStrength === 250, 'Material should have default yield strength');
+
+                // Test material metadata retrieval
+                const metadata = materialStore.getMaterialMetadata(MaterialType.STEEL);
+                assert(metadata.name === 'Steel', 'Should retrieve correct material metadata');
+                assert(Array.isArray(metadata.commonApplications), 'Should have common applications list');
+
+                // Test default properties retrieval
+                const defaultProps = materialStore.getDefaultProperties(MaterialType.STEEL, 'A36');
+                assert(defaultProps !== null, 'Should retrieve default properties');
+                assert(defaultProps.density === 7850, 'Should have correct default density');
+
+                log('✅ All material configuration tests passed!');
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`);
+                console.error(error);
+            }
+        };
+    </script>
+</body>
+</html> 

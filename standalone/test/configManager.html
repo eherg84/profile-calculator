@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Configuration Manager Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .test-output {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Configuration Manager Tests</h1>
+    <button onclick="runTests()">Run Tests</button>
+    <div id="output" class="test-output"></div>
+
+    <script type="module">
+        import configManager, { MaterialConfig, ProfileConfig, UIConfig } from '../js/core/config/index.js';
+
+        // Test helper functions
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message);
+            }
+        }
+
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += message + '\n';
+        }
+
+        // Make runTests available globally
+        window.runTests = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = '';
+            
+            try {
+                log('Running Configuration Manager Tests...');
+
+                // Test module access
+                assert(configManager.getConfig('material') === MaterialConfig, 'Should get material config module');
+                assert(configManager.getConfig('profile') === ProfileConfig, 'Should get profile config module');
+                assert(configManager.getConfig('ui') === UIConfig, 'Should get UI config module');
+
+                // Test convenience getters
+                assert(configManager.getMaterialConfig() === MaterialConfig, 'Should get material config');
+                assert(configManager.getProfileConfig() === ProfileConfig, 'Should get profile config');
+                assert(configManager.getUIConfig() === UIConfig, 'Should get UI config');
+
+                // Test profile validation retrieval
+                const roundTubeValidation = configManager.getProfileValidation('round_tube');
+                assert(Array.isArray(roundTubeValidation.required), 'Should have required dimensions array');
+                assert(roundTubeValidation.required.includes('diameter'), 'Should include required diameter');
+                assert(Array.isArray(roundTubeValidation.optional), 'Should have optional dimensions array');
+                assert(roundTubeValidation.optional.includes('outer_radius'), 'Should include optional outer radius');
+                assert(Array.isArray(roundTubeValidation.rules), 'Should have validation rules array');
+
+                // Test caching for profile validation
+                const cachedValidation = configManager.getProfileValidation('round_tube');
+                assert(cachedValidation === roundTubeValidation, 'Should return cached validation');
+
+                // Test material properties retrieval
+                const steelA36Props = configManager.getMaterialProperties('steel', 'A36');
+                assert(steelA36Props.defaults !== null, 'Should have default properties');
+                assert(steelA36Props.defaults.density === 7850, 'Should have correct density');
+                assert(steelA36Props.validation !== null, 'Should have validation rules');
+
+                // Test caching for material properties
+                const cachedProps = configManager.getMaterialProperties('steel', 'A36');
+                assert(cachedProps === steelA36Props, 'Should return cached properties');
+
+                // Test theme configuration retrieval
+                const lightTheme = configManager.getThemeConfig('light');
+                assert(lightTheme !== null, 'Should get light theme config');
+                assert(lightTheme.name === 'Light', 'Should have correct theme name');
+                assert(lightTheme.colors.primary === '#4CAF50', 'Should have correct primary color');
+
+                // Test caching for theme configuration
+                const cachedTheme = configManager.getThemeConfig('light');
+                assert(cachedTheme === lightTheme, 'Should return cached theme config');
+
+                // Test cache clearing
+                configManager.clearCache();
+                const newValidation = configManager.getProfileValidation('round_tube');
+                assert(newValidation !== roundTubeValidation, 'Should create new validation after cache clear');
+
+                log('✅ All configuration manager tests passed!');
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`);
+                console.error(error);
+            }
+        };
+    </script>
+</body>
+</html> 

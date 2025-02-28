@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Profile Calculator Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .test-output {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Profile Calculator Tests</h1>
+    <button onclick="runTests()">Run Tests</button>
+    <div id="output" class="test-output"></div>
+
+    <script type="module">
+        import ProfileCalculator from '../js/modules/calculations/profileCalculator.js';
+        import { ProfileType } from '../js/core/config/profiles.js';
+        import configManager from '../js/core/config/index.js';
+
+        // Test helper functions
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message);
+            }
+        }
+
+        function assertClose(actual, expected, message) {
+            const epsilon = 0.0001;
+            if (Math.abs(actual - expected) > epsilon) {
+                throw new Error(`${message}: expected ${expected}, got ${actual}`);
+            }
+        }
+
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += message + '\n';
+        }
+
+        // Test data
+        const testProfiles = {
+            roundTube: {
+                type: ProfileType.ROUND_TUBE,
+                dimensions: {
+                    diameter: 100,    // mm
+                    thickness: 5,     // mm
+                    length: 1000      // mm
+                }
+            },
+            squareTube: {
+                type: ProfileType.SQUARE_TUBE,
+                dimensions: {
+                    width: 100,       // mm
+                    thickness: 5,     // mm
+                    length: 1000      // mm
+                }
+            },
+            rectangularTube: {
+                type: ProfileType.RECTANGULAR_TUBE,
+                dimensions: {
+                    width: 100,       // mm
+                    height: 150,      // mm
+                    thickness: 5,     // mm
+                    length: 1000      // mm
+                }
+            },
+            angle: {
+                type: ProfileType.ANGLE,
+                dimensions: {
+                    width: 100,       // mm
+                    height: 100,      // mm
+                    thickness: 8,     // mm
+                    length: 1000      // mm
+                }
+            },
+            channel: {
+                type: ProfileType.CHANNEL,
+                dimensions: {
+                    width: 100,       // mm
+                    height: 150,      // mm
+                    thickness: 8,     // mm
+                    flange_width: 50, // mm
+                    length: 1000      // mm
+                }
+            },
+            iBeam: {
+                type: ProfileType.I_BEAM,
+                dimensions: {
+                    width: 150,           // mm
+                    height: 300,          // mm
+                    web_thickness: 8,     // mm
+                    flange_thickness: 12, // mm
+                    length: 1000          // mm
+                }
+            }
+        };
+
+        // Make runTests available globally
+        window.runTests = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = '';
+            
+            try {
+                log('Running Profile Calculator Tests...');
+
+                // Test Round Tube Calculations
+                log('\nTesting Round Tube Calculations:');
+                const roundTube = testProfiles.roundTube;
+                const roundArea = ProfileCalculator.calculateArea(roundTube.type, roundTube.dimensions);
+                assertClose(roundArea, 1492.256, 'Round tube area calculation');
+                
+                const roundIx = ProfileCalculator.calculateMomentOfInertiaX(roundTube.type, roundTube.dimensions);
+                assertClose(roundIx, 177244.667, 'Round tube moment of inertia');
+                
+                const roundSx = ProfileCalculator.calculateSectionModulusX(roundTube.type, roundTube.dimensions);
+                assertClose(roundSx, 3544.893, 'Round tube section modulus');
+
+                // Test Square Tube Calculations
+                log('\nTesting Square Tube Calculations:');
+                const squareTube = testProfiles.squareTube;
+                const squareArea = ProfileCalculator.calculateArea(squareTube.type, squareTube.dimensions);
+                assertClose(squareArea, 1900, 'Square tube area calculation');
+                
+                const squareIx = ProfileCalculator.calculateMomentOfInertiaX(squareTube.type, squareTube.dimensions);
+                assertClose(squareIx, 244166.667, 'Square tube moment of inertia');
+
+                // Test Rectangular Tube Calculations
+                log('\nTesting Rectangular Tube Calculations:');
+                const rectTube = testProfiles.rectangularTube;
+                const rectArea = ProfileCalculator.calculateArea(rectTube.type, rectTube.dimensions);
+                assertClose(rectArea, 2400, 'Rectangular tube area calculation');
+                
+                const rectIx = ProfileCalculator.calculateMomentOfInertiaX(rectTube.type, rectTube.dimensions);
+                assertClose(rectIx, 823333.333, 'Rectangular tube moment of inertia');
+
+                // Test Angle Calculations
+                log('\nTesting Angle Calculations:');
+                const angle = testProfiles.angle;
+                const angleArea = ProfileCalculator.calculateArea(angle.type, angle.dimensions);
+                assertClose(angleArea, 1536, 'Angle area calculation');
+                
+                const angleIx = ProfileCalculator.calculateMomentOfInertiaX(angle.type, angle.dimensions);
+                assertClose(angleIx, 147456, 'Angle moment of inertia');
+
+                // Test Channel Calculations
+                log('\nTesting Channel Calculations:');
+                const channel = testProfiles.channel;
+                const channelArea = ProfileCalculator.calculateArea(channel.type, channel.dimensions);
+                assertClose(channelArea, 2000, 'Channel area calculation');
+                
+                const channelIx = ProfileCalculator.calculateMomentOfInertiaX(channel.type, channel.dimensions);
+                assertClose(channelIx, 583333.333, 'Channel moment of inertia');
+
+                // Test I-Beam Calculations
+                log('\nTesting I-Beam Calculations:');
+                const iBeam = testProfiles.iBeam;
+                const iBeamArea = ProfileCalculator.calculateArea(iBeam.type, iBeam.dimensions);
+                assertClose(iBeamArea, 4800, 'I-beam area calculation');
+                
+                const iBeamIx = ProfileCalculator.calculateMomentOfInertiaX(iBeam.type, iBeam.dimensions);
+                assertClose(iBeamIx, 7164000, 'I-beam moment of inertia');
+
+                // Test Weight Calculations
+                log('\nTesting Weight Calculations:');
+                const density = 7850; // kg/m³ (steel)
+                const roundWeight = ProfileCalculator.calculateWeightPerLength(roundTube.type, roundTube.dimensions, density);
+                assertClose(roundWeight * 1000, 11714.71, 'Round tube weight per meter');
+
+                // Test Radius of Gyration
+                log('\nTesting Radius of Gyration:');
+                const roundGyration = ProfileCalculator.calculateRadiusOfGyration(roundTube.type, roundTube.dimensions);
+                assertClose(roundGyration, 34.47, 'Round tube radius of gyration');
+
+                log('✅ All profile calculator tests passed!');
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`);
+                console.error(error);
+            }
+        };
+    </script>
+</body>
+</html> 

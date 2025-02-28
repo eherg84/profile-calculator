@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Profile Configuration Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .test-output {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Profile Configuration Tests</h1>
+    <button onclick="runTests()">Run Tests</button>
+    <div id="output" class="test-output"></div>
+
+    <script type="module">
+        import {
+            ProfileType,
+            ProfileCategory,
+            RequiredDimensions,
+            OptionalDimensions,
+            DimensionValidation,
+            ProfileValidation,
+            ProfileMetadata
+        } from '../js/core/config/profiles.js';
+
+        // Test helper functions
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message);
+            }
+        }
+
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += message + '\n';
+        }
+
+        // Make runTests available globally
+        window.runTests = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = '';
+            
+            try {
+                log('Running Profile Configuration Tests...');
+
+                // Test Profile Categories
+                assert(ProfileCategory.CLOSED === 'closed', 'Closed category should be defined correctly');
+                assert(ProfileCategory.OPEN === 'open', 'Open category should be defined correctly');
+
+                // Test Profile Types
+                assert(ProfileType.ROUND_TUBE === 'round_tube', 'Round tube type should be defined correctly');
+                assert(ProfileType.SQUARE_TUBE === 'square_tube', 'Square tube type should be defined correctly');
+                assert(ProfileType.RECTANGULAR_TUBE === 'rectangular_tube', 'Rectangular tube type should be defined correctly');
+                assert(ProfileType.ANGLE === 'angle', 'Angle type should be defined correctly');
+                assert(ProfileType.CHANNEL === 'channel', 'Channel type should be defined correctly');
+                assert(ProfileType.I_BEAM === 'i_beam', 'I-beam type should be defined correctly');
+
+                // Test Required Dimensions
+                const roundTubeDims = RequiredDimensions[ProfileType.ROUND_TUBE];
+                assert(roundTubeDims.includes('diameter'), 'Round tube should require diameter');
+                assert(roundTubeDims.includes('thickness'), 'Round tube should require thickness');
+                assert(roundTubeDims.includes('length'), 'Round tube should require length');
+
+                const iBeamDims = RequiredDimensions[ProfileType.I_BEAM];
+                assert(iBeamDims.includes('web_thickness'), 'I-beam should require web thickness');
+                assert(iBeamDims.includes('flange_thickness'), 'I-beam should require flange thickness');
+
+                // Test Optional Dimensions
+                const roundTubeOpt = OptionalDimensions[ProfileType.ROUND_TUBE];
+                assert(roundTubeOpt.includes('outer_radius'), 'Round tube should have optional outer radius');
+
+                const channelOpt = OptionalDimensions[ProfileType.CHANNEL];
+                assert(channelOpt.includes('root_radius'), 'Channel should have optional root radius');
+                assert(channelOpt.includes('toe_radius'), 'Channel should have optional toe radius');
+
+                // Test Dimension Validation
+                assert(DimensionValidation.length.min === 1, 'Minimum length should be correct');
+                assert(DimensionValidation.length.max === 1000000, 'Maximum length should be correct');
+                assert(DimensionValidation.thickness.min === 0.1, 'Minimum thickness should be correct');
+                assert(DimensionValidation.thickness.required === true, 'Thickness should be required');
+
+                // Test Profile-specific Validation Rules
+                const roundTubeRules = ProfileValidation[ProfileType.ROUND_TUBE].rules;
+                assert(Array.isArray(roundTubeRules), 'Round tube should have validation rules');
+                assert(typeof roundTubeRules[0].check === 'function', 'Validation rule should have check function');
+                assert(typeof roundTubeRules[0].message === 'string', 'Validation rule should have message');
+
+                // Test validation rule execution
+                const validRoundTube = {
+                    diameter: 100,
+                    thickness: 5
+                };
+                assert(roundTubeRules[0].check(validRoundTube), 'Valid round tube should pass validation');
+
+                const invalidRoundTube = {
+                    diameter: 100,
+                    thickness: 60
+                };
+                assert(!roundTubeRules[0].check(invalidRoundTube), 'Invalid round tube should fail validation');
+
+                // Test Profile Metadata
+                const roundTubeMeta = ProfileMetadata[ProfileType.ROUND_TUBE];
+                assert(roundTubeMeta.category === ProfileCategory.CLOSED, 'Round tube should be in closed category');
+                assert(roundTubeMeta.name === 'Round Tube', 'Round tube should have correct name');
+                assert(Array.isArray(roundTubeMeta.commonUses), 'Should have common uses array');
+                assert(Array.isArray(roundTubeMeta.standards), 'Should have standards array');
+                assert(roundTubeMeta.standards.includes('ASTM A500'), 'Should include correct standards');
+
+                const channelMeta = ProfileMetadata[ProfileType.CHANNEL];
+                assert(channelMeta.category === ProfileCategory.OPEN, 'Channel should be in open category');
+                assert(channelMeta.standards.includes('EN 10279'), 'Should include correct standards');
+
+                log('✅ All profile configuration tests passed!');
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`);
+                console.error(error);
+            }
+        };
+    </script>
+</body>
+</html> 

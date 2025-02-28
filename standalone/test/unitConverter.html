@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Unit Converter Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .test-output {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Unit Converter Tests</h1>
+    <button onclick="runTests()">Run Tests</button>
+    <div id="output" class="test-output"></div>
+
+    <script>
+        // Unit Types
+        const UnitType = {
+            LENGTH: 'length',
+            WEIGHT: 'weight',
+            AREA: 'area',
+            VOLUME: 'volume'
+        };
+
+        // Unit Systems
+        const UnitSystem = {
+            METRIC: 'metric',
+            IMPERIAL: 'imperial'
+        };
+
+        // Conversion factors (to base units: mm for length, kg for weight)
+        const ConversionFactors = {
+            length: {
+                mm: 1,
+                cm: 10,
+                m: 1000,
+                in: 25.4,
+                ft: 304.8
+            },
+            weight: {
+                kg: 1,
+                g: 0.001,
+                lb: 0.45359237,
+                oz: 0.028349523125
+            },
+            area: {
+                mm2: 1,
+                cm2: 100,
+                m2: 1000000,
+                in2: 645.16,
+                ft2: 92903.04
+            },
+            volume: {
+                mm3: 1,
+                cm3: 1000,
+                m3: 1000000000,
+                in3: 16387.064,
+                ft3: 28316846.592
+            }
+        };
+
+        class UnitConverter {
+            constructor(eventBus) {
+                this.eventBus = eventBus;
+                this.currentSystem = UnitSystem.METRIC;
+            }
+
+            setUnitSystem(system) {
+                if (!Object.values(UnitSystem).includes(system)) {
+                    throw new Error(`Invalid unit system: ${system}`);
+                }
+                this.currentSystem = system;
+                this.eventBus.emit('units:systemChanged', { system });
+            }
+
+            convert(value, fromUnit, toUnit, type) {
+                if (!Object.values(UnitType).includes(type)) {
+                    throw new Error(`Invalid unit type: ${type}`);
+                }
+
+                const factors = ConversionFactors[type];
+                if (!factors[fromUnit] || !factors[toUnit]) {
+                    throw new Error(`Invalid unit conversion: ${fromUnit} to ${toUnit}`);
+                }
+
+                const baseValue = value * factors[fromUnit];
+                return baseValue / factors[toUnit];
+            }
+
+            convertDimensions(dimensions, fromUnit, toUnit) {
+                const result = {};
+                for (const [key, value] of Object.entries(dimensions)) {
+                    if (typeof value === 'number') {
+                        result[key] = this.convert(value, fromUnit, toUnit, UnitType.LENGTH);
+                    } else {
+                        result[key] = value;
+                    }
+                }
+                return result;
+            }
+
+            formatWithUnit(value, unit, precision = 2) {
+                return `${value.toFixed(precision)} ${unit}`;
+            }
+
+            getDefaultUnit(type) {
+                const defaults = {
+                    [UnitSystem.METRIC]: {
+                        [UnitType.LENGTH]: 'mm',
+                        [UnitType.WEIGHT]: 'kg',
+                        [UnitType.AREA]: 'mm2',
+                        [UnitType.VOLUME]: 'mm3'
+                    },
+                    [UnitSystem.IMPERIAL]: {
+                        [UnitType.LENGTH]: 'in',
+                        [UnitType.WEIGHT]: 'lb',
+                        [UnitType.AREA]: 'in2',
+                        [UnitType.VOLUME]: 'in3'
+                    }
+                };
+
+                return defaults[this.currentSystem][type];
+            }
+
+            getAvailableUnits(type) {
+                return Object.keys(ConversionFactors[type] || {});
+            }
+        }
+
+        // Test helper functions
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message);
+            }
+        }
+
+        function assertClose(actual, expected, message) {
+            const epsilon = 0.0001;
+            assert(Math.abs(actual - expected) < epsilon, message);
+        }
+
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += message + '\n';
+        }
+
+        // Test runner
+        window.runTests = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = '';
+            
+            try {
+                // Setup
+                const mockEventBus = {
+                    emit: function(event, data) {
+                        log(`Event emitted: ${event}`);
+                    }
+                };
+                const converter = new UnitConverter(mockEventBus);
+
+                // Unit System Tests
+                log('Running Unit System Tests...');
+                assert(converter.currentSystem === UnitSystem.METRIC, 'Should initialize with metric system');
+                
+                converter.setUnitSystem(UnitSystem.IMPERIAL);
+                assert(converter.currentSystem === UnitSystem.IMPERIAL, 'Should change to imperial system');
+                
+                try {
+                    converter.setUnitSystem('invalid');
+                    assert(false, 'Should throw error for invalid unit system');
+                } catch (error) {
+                    assert(error.message.includes('Invalid unit system'), 'Should throw correct error message');
+                }
+
+                // Unit Conversion Tests
+                log('Running Unit Conversion Tests...');
+                assert(converter.convert(1000, 'mm', 'm', UnitType.LENGTH) === 1, 'Should convert mm to m correctly');
+                assert(converter.convert(1, 'm', 'mm', UnitType.LENGTH) === 1000, 'Should convert m to mm correctly');
+                assertClose(converter.convert(1, 'in', 'mm', UnitType.LENGTH), 25.4, 'Should convert in to mm correctly');
+                
+                assert(converter.convert(1, 'kg', 'g', UnitType.WEIGHT) === 1000, 'Should convert kg to g correctly');
+                assertClose(converter.convert(1, 'lb', 'kg', UnitType.WEIGHT), 0.45359237, 'Should convert lb to kg correctly');
+                assert(converter.convert(16, 'oz', 'lb', UnitType.WEIGHT) === 1, 'Should convert oz to lb correctly');
+
+                assert(converter.convert(1, 'm2', 'cm2', UnitType.AREA) === 10000, 'Should convert m² to cm² correctly');
+                assertClose(converter.convert(1, 'in2', 'mm2', UnitType.AREA), 645.16, 'Should convert in² to mm² correctly');
+
+                // Dimension Conversion Tests
+                log('Running Dimension Conversion Tests...');
+                const dimensions = {
+                    width: 100,
+                    height: 200,
+                    thickness: 5,
+                    length: 1000
+                };
+                const converted = converter.convertDimensions(dimensions, 'mm', 'cm');
+                assert(converted.width === 10, 'Should convert width correctly');
+                assert(converted.height === 20, 'Should convert height correctly');
+                assert(converted.thickness === 0.5, 'Should convert thickness correctly');
+                assert(converted.length === 100, 'Should convert length correctly');
+
+                // Test non-numeric values
+                const mixedDimensions = {
+                    width: 100,
+                    height: 'unknown',
+                    thickness: 5
+                };
+                const mixedConverted = converter.convertDimensions(mixedDimensions, 'mm', 'cm');
+                assert(mixedConverted.width === 10, 'Should convert numeric values');
+                assert(mixedConverted.height === 'unknown', 'Should preserve non-numeric values');
+                assert(mixedConverted.thickness === 0.5, 'Should convert numeric values when mixed');
+
+                // Unit Formatting Tests
+                log('Running Unit Formatting Tests...');
+                assert(converter.formatWithUnit(10.1234, 'mm') === '10.12 mm', 'Should format with default precision');
+                assert(converter.formatWithUnit(10.1234, 'mm', 3) === '10.123 mm', 'Should format with custom precision');
+
+                // Default Units Tests
+                log('Running Default Units Tests...');
+                converter.setUnitSystem(UnitSystem.METRIC);
+                assert(converter.getDefaultUnit(UnitType.LENGTH) === 'mm', 'Should return mm for metric length');
+                assert(converter.getDefaultUnit(UnitType.WEIGHT) === 'kg', 'Should return kg for metric weight');
+
+                converter.setUnitSystem(UnitSystem.IMPERIAL);
+                assert(converter.getDefaultUnit(UnitType.LENGTH) === 'in', 'Should return in for imperial length');
+                assert(converter.getDefaultUnit(UnitType.WEIGHT) === 'lb', 'Should return lb for imperial weight');
+
+                // Available Units Tests
+                log('Running Available Units Tests...');
+                const lengthUnits = converter.getAvailableUnits(UnitType.LENGTH);
+                assert(lengthUnits.includes('mm'), 'Should include mm in length units');
+                assert(lengthUnits.includes('in'), 'Should include in in length units');
+
+                const weightUnits = converter.getAvailableUnits(UnitType.WEIGHT);
+                assert(weightUnits.includes('kg'), 'Should include kg in weight units');
+                assert(weightUnits.includes('lb'), 'Should include lb in weight units');
+
+                assert(converter.getAvailableUnits('invalid').length === 0, 'Should return empty array for invalid type');
+
+                log('✅ All tests passed!');
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`);
+                console.error(error);
+            }
+        };
+    </script>
+</body>
+</html> 
